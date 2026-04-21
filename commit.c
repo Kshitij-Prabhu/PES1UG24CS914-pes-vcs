@@ -194,36 +194,38 @@ int head_update(const ObjectID *new_commit) {
 //
 // Returns 0 on success, -1 on error.
 int commit_create(const char *message, ObjectID *commit_id_out) {
+    // TODO: Implement commit creation
+    // (See Lab Appendix for logical steps)
+
+    // build tree from the current index
     Commit c;
     memset(&c, 0, sizeof(c));
 
-    if (tree_from_index(&c.tree) != 0)
-        return -1;
-
-    if (head_read(&c.parent) == 0)
-        c.has_parent = 1;
-    else
-        c.has_parent = 0;
-
-    snprintf(c.author, sizeof(c.author), "%s", pes_author());
-    c.timestamp = time(NULL);
-    snprintf(c.message, sizeof(c.message), "%s", message);
-
-    void *data = NULL;
-    size_t len = 0;
-
-    if (commit_serialize(&c, &data, &len) != 0)
-        return -1;
-
-    if (object_write(OBJ_COMMIT, data, len, commit_id_out) != 0) {
-        free(data);
+    if (tree_from_index(&c.tree) != 0) {
+        fprintf(stderr, "error: failed to build tree from index\n");
         return -1;
     }
 
-    free(data);
-
-    if (head_update(commit_id_out) != 0)
-        return -1;
     
-    return 0;
+    if (head_read(&c.parent) == 0) {
+        c.has_parent = 1;
+    } else {
+        c.has_parent = 0;
+    }
+
+    // fill author, timestamp, message
+    snprintf(c.author,  sizeof(c.author),  "%s", pes_author());
+    snprintf(c.message, sizeof(c.message), "%s", message);
+    c.timestamp = (uint64_t)time(NULL);
+
+    // serialize and write commit object
+    void *cdata; size_t clen;
+    if (commit_serialize(&c, &cdata, &clen) != 0) return -1;
+    int rc = object_write(OBJ_COMMIT, cdata, clen, commit_id_out);
+    free(cdata);
+    if (rc != 0)
+        return -1;
+
+    // update HEAD/branch ref to point to new commit
+    return head_update(commit_id_out);
 }
